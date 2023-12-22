@@ -8,6 +8,8 @@ class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ['id', 'username', 'first_name', 'last_name', 'email']
+        extra_kwargs = {'email': {'required': False}}
+
 
 
 
@@ -43,19 +45,30 @@ class ClientProfileSerializer(serializers.ModelSerializer):
             'profile_image',
             'contact_name',
             'contact_email',
-            'preferred_communication'
+            'preferred_communication',
+            'profile_video'
         ]
         read_only_fields = ('contact_name', 'contact_email')  # These fields are auto-populated
 
 
 class FreelancerProfileSerializer(serializers.ModelSerializer):
     skill_names = serializers.ListField(child=serializers.CharField(), write_only=True, required=False)
-    user = UserSerializer(read_only=True)  # Include this line to serialize user data
+    user = UserSerializer(read_only=True)
     reviews = serializers.SerializerMethodField()
+    introduction_video = serializers.FileField(required=False)  # Add this line
 
     class Meta:
         model = FreelancerProfile
-        fields = ['user', 'portfolio', 'skills', 'skill_names', 'profile_image', 'average_rating', 'reviews']
+        fields = [
+            'user',
+            'portfolio',
+            'skills',
+            'skill_names',
+            'profile_image',
+            'average_rating',
+            'reviews',
+            'introduction_video',  # Include the field here
+        ]
         extra_kwargs = {'skills': {'read_only': True}}
 
     def to_representation(self, instance):
@@ -106,3 +119,8 @@ class ReviewSerializer(serializers.ModelSerializer):
     class Meta:
         model = Review
         fields = ['rating', 'text']
+
+class SkillSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Skill
+        fields = ['id', 'name']

@@ -91,3 +91,5 @@ def get_matched_listings(request):
 
     serializer = OpenListingSerializer(listings, many=True)
     return Response(serializer.data)
+
+

@@ -124,26 +124,36 @@ class UserLogoutAPIView(APIView):
 
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.parsers import MultiPartParser, FormParser
+
+
 class UserProfileUpdateView(APIView):
     permission_classes = [IsAuthenticated]
-    parser_classes = (MultiPartParser, FormParser)  # Add parser classes
+    parser_classes = [MultiPartParser, FormParser]
 
     def put(self, request, *args, **kwargs):
         user = request.user
         data = request.data
 
+        # Update user details
+        user_serializer = UserSerializer(user, data=data, partial=True)
+        if user_serializer.is_valid():
+            user_serializer.save()
+
+        # Update profile details based on user role, including video file
         if user.role == 'freelancer':
-            profile_serializer = FreelancerProfileSerializer(user.freelancer_profile, data=data, context={'request': request})
+            profile = user.freelancer_profile
+            profile_serializer = FreelancerProfileSerializer(profile, data=data, partial=True)
         elif user.role == 'client':
-            profile_serializer = ClientProfileSerializer(user.client_profile, data=data, context={'request': request})
+            profile = user.client_profile
+            profile_serializer = ClientProfileSerializer(profile, data=data, partial=True)
         else:
             return Response({'error': 'Invalid user role'}, status=status.HTTP_400_BAD_REQUEST)
 
         if profile_serializer.is_valid():
             profile_serializer.save()
-            return Response(profile_serializer.data, status=status.HTTP_200_OK)
-        return Response(profile_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            return Response({**user_serializer.data, **profile_serializer.data}, status=status.HTTP_200_OK)
 
+        return Response({**user_serializer.errors, **profile_serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
 
 class UserLoginAPIView(APIView):
     def post(self, request, *args, **kwargs):
@@ -161,3 +171,12 @@ class UserLoginAPIView(APIView):
             }, status=status.HTTP_200_OK)
 
         return Response({'error': 'Invalid Credentials'}, status=status.HTTP_401_UNAUTHORIZED)
+
+
+from .models import Skill
+from .serializers import SkillSerializer
+from rest_framework import generics
+
+class SkillListView(generics.ListAPIView):
+    queryset = Skill.objects.all()
+    serializer_class = SkillSerializer
