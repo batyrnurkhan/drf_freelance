@@ -147,7 +147,7 @@ CORS_ALLOW_ALL_ORIGINS = True  # Allows access from any origin, not recommended 
 # Or, if you want to be more specific:
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",  # The domain of your React app
-    # Add any other domains from which you expect requests
+    "yerserik.pythonanywhere.com",
 ]
 
 MEDIA_URL = '/media/'
