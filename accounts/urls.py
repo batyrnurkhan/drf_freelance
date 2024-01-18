@@ -1,6 +1,7 @@
 from django.urls import path
 from .views import UserRegistrationAPIView, UserLoginAPIView, UserProfileView, FreelancerListView, \
-    FreelancerProfileView, CreateReviewView, TopFreelancersView, UserLogoutAPIView, UserProfileUpdateView, SkillListView
+    FreelancerProfileView, CreateReviewView, TopFreelancersView, UserLogoutAPIView, UserProfileUpdateView, \
+    SkillListView, SearchFreelancerView, search_freelancers
 
 urlpatterns = [
     path('register/', UserRegistrationAPIView.as_view(), name='register'),
@@ -13,5 +14,6 @@ urlpatterns = [
     path('api/logout/', UserLogoutAPIView.as_view(), name='logout'),
     path('profile/update/', UserProfileUpdateView.as_view(), name='profile-update'),
     path('skills/', SkillListView.as_view(), name='skill-list'),
-
+    path('search/freelancers/', SearchFreelancerView.as_view(), name='search_freelancers'),
+    path('editlisting/search/', search_freelancers, name='search_freelancers'),
 ]

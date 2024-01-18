@@ -2,20 +2,32 @@ from rest_framework.generics import get_object_or_404
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-from .serializers import ChatSerializer, MessageSerializer
-from .models import Chat, Message
+from .serializers import ChatSerializer
+from .models import Chat
 from accounts.models import CustomUser
+import logging
 
+logger = logging.getLogger(__name__)
 
 class StartChatView(APIView):
     def post(self, request, username):
-        client = get_object_or_404(CustomUser, username=username)
-        if request.user.user_type == 'freelancer' and client.user_type == 'client':
-            chat = Chat.get_or_create_with_participants(request.user, client)
-            serializer = ChatSerializer(chat)
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        else:
-            return Response(status=status.HTTP_400_BAD_REQUEST)
+        try:
+            client = get_object_or_404(CustomUser, username=username)
+            logger.debug(f'Request User Role: {request.user.role}, Client Role: {client.role}')
+
+            if request.user.role == 'freelancer' and client.role == 'client':
+                chat = Chat.get_or_create_with_participants(request.user, client)
+                serializer = ChatSerializer(chat)
+                return Response(serializer.data, status=status.HTTP_201_CREATED)
+            else:
+                logger.debug('Role condition failed')
+                return Response({'error': 'Invalid user roles or user not found'}, status=status.HTTP_400_BAD_REQUEST)
+        except CustomUser.DoesNotExist:
+            logger.debug('User not found')
+            return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            logger.error(f'Error in StartChatView: {e}')
+            return Response({'error': 'Server error'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class ChatListView(APIView):
@@ -47,20 +59,21 @@ class ChatDetailView(APIView):
 
 
 class ChatCreateView(APIView):
-    def get(self, request, username):
+    def post(self, request, username):
         client = get_object_or_404(CustomUser, username=username)
-        if request.user.user_type == 'freelancer' and client.user_type == 'client':
-            chat, created = Chat.objects.get_or_create()
-            chat.participants.add(request.user, client)
+        if request.user.role == 'client' and client.role == 'freelancer':
+            # Use get_or_create_with_participants class method to handle chat creation
+            chat = Chat.get_or_create_with_participants(request.user, client)
             serializer = ChatSerializer(chat)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         else:
-            return Response(status=status.HTTP_400_BAD_REQUEST)
+            return Response({'error': 'Invalid user roles or user not found'}, status=status.HTTP_400_BAD_REQUEST)
+
 
 
 from rest_framework.permissions import IsAuthenticated
 
-
+from .serializers import MessageSerializer
 class SendMessageView(APIView):
     permission_classes = [IsAuthenticated]
 

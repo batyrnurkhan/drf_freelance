@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
-from .models import ClientProfile, FreelancerProfile, Review, Skill
+from .models import ClientProfile, FreelancerProfile, Review, Skill, CustomUser
 
 User = get_user_model()
 
@@ -17,8 +17,13 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True)
 
     class Meta:
-        model = User
+        model = CustomUser
         fields = ['id', 'username', 'first_name', 'last_name', 'email', 'password', 'role']
+
+    def validate_username(self, value):
+        if len(value) < 8:
+            raise serializers.ValidationError("Username must be at least 8 characters long")
+        return value
 
     def create(self, validated_data):
         user = User.objects.create(
@@ -36,6 +41,8 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
 
 
 class ClientProfileSerializer(serializers.ModelSerializer):
+    user = UserSerializer(read_only=True)
+
     class Meta:
         model = ClientProfile
         fields = [
@@ -52,10 +59,9 @@ class ClientProfileSerializer(serializers.ModelSerializer):
 
 
 class FreelancerProfileSerializer(serializers.ModelSerializer):
-    skill_names = serializers.ListField(child=serializers.CharField(), write_only=True, required=False)
+    skill_ids = serializers.ListField(child=serializers.IntegerField(), write_only=True, required=False)
     user = UserSerializer(read_only=True)
     reviews = serializers.SerializerMethodField()
-    introduction_video = serializers.FileField(required=False)  # Add this line
 
     class Meta:
         model = FreelancerProfile
@@ -63,11 +69,11 @@ class FreelancerProfileSerializer(serializers.ModelSerializer):
             'user',
             'portfolio',
             'skills',
-            'skill_names',
+            'skill_ids',
             'profile_image',
             'average_rating',
             'reviews',
-            'introduction_video',  # Include the field here
+            'introduction_video',
         ]
         extra_kwargs = {'skills': {'read_only': True}}
 
@@ -77,20 +83,18 @@ class FreelancerProfileSerializer(serializers.ModelSerializer):
         return response
 
     def update(self, instance, validated_data):
-        skill_names = validated_data.pop('skill_names', None)
-        if skill_names is not None:
-            skills = [Skill.objects.get_or_create(name=name)[0] for name in skill_names]
+        skill_ids = validated_data.get('skill_ids')
+        if skill_ids is not None:
+            # Fetch the skills based on IDs and update
+            skills = Skill.objects.filter(id__in=skill_ids)
             instance.skills.set(skills)
+
+        # Update other fields
         return super().update(instance, validated_data)
 
     def get_reviews(self, obj):
-        reviews = obj.received_reviews.all()  # assuming a reverse relation from Review to FreelancerProfile
+        reviews = obj.received_reviews.all()
         return ReviewSerializer(reviews, many=True).data
-
-    def get_profile_image_url(self, obj):
-        if obj.profile_image:
-            return obj.profile_image.url
-        return None
 
 
 class FreelancerProfileNestedSerializer(serializers.ModelSerializer):

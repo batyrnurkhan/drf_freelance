@@ -11,7 +11,8 @@ class Chat(models.Model):
             chat = cls.objects.create()
             chat.participants.add(user1, user2)
             chat.save()
-        return chat
+            return chat, True  # Chat created
+        return chat, False  # Chat already exists
 
     def __str__(self):
         return "{}".format(self.pk)

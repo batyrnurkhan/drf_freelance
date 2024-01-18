@@ -9,6 +9,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework import status
+from rest_framework.parsers import JSONParser
 
 class UserRegistrationAPIView(APIView):
     def post(self, request, *args, **kwargs):
@@ -56,6 +57,8 @@ class UserProfileView(generics.RetrieveAPIView):
         return Response(response_data)
 
     def put(self, request, *args, **kwargs):
+        print("Received data:", request.data)
+
         return self.update(request, *args, **kwargs)
 
     def patch(self, request, *args, **kwargs):
@@ -124,13 +127,15 @@ class UserLogoutAPIView(APIView):
 
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.parsers import MultiPartParser, FormParser
-
+from datetime import timezone
 
 class UserProfileUpdateView(APIView):
     permission_classes = [IsAuthenticated]
-    parser_classes = [MultiPartParser, FormParser]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
 
     def put(self, request, *args, **kwargs):
+        print("Received data for update:", request.data)
+
         user = request.user
         data = request.data
 
@@ -141,8 +146,11 @@ class UserProfileUpdateView(APIView):
 
         # Update profile details based on user role, including video file
         if user.role == 'freelancer':
-            profile = user.freelancer_profile
-            profile_serializer = FreelancerProfileSerializer(profile, data=data, partial=True)
+            profile_serializer = FreelancerProfileSerializer(user.freelancer_profile, data=data, partial=True)
+            if profile_serializer.is_valid():
+                profile_serializer.save()
+                return Response(profile_serializer.data, status=status.HTTP_200_OK)
+            return Response(profile_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         elif user.role == 'client':
             profile = user.client_profile
             profile_serializer = ClientProfileSerializer(profile, data=data, partial=True)
@@ -180,3 +188,32 @@ from rest_framework import generics
 class SkillListView(generics.ListAPIView):
     queryset = Skill.objects.all()
     serializer_class = SkillSerializer
+
+from django.db.models import Q
+class SearchFreelancerView(APIView):
+    def get(self, request):
+        query = request.GET.get('q', '')
+        freelancers = FreelancerProfile.objects.filter(
+            Q(user__username__icontains=query) |
+            Q(user__email__icontains=query) |
+            Q(user__first_name__icontains=query) |   # Added search by first name
+            Q(user__last_name__icontains=query) |    # Added search by last name
+            Q(skills__name__icontains=query)
+        ).distinct()
+        serializer = FreelancerProfileSerializer(freelancers, many=True)
+        return Response(serializer.data)
+
+
+from rest_framework.decorators import api_view
+from rest_framework.response import Response
+from .models import FreelancerProfile
+
+@api_view(['GET'])
+def search_freelancers(request):
+    query = request.GET.get('q', '')
+    print(f"Query: {query}")  # Check the actual query value
+    freelancers = FreelancerProfile.objects.filter(user__username__icontains=query)
+    print(freelancers)  # Check the queryset
+    data = [{'username': freelancer.user.username} for freelancer in freelancers]
+    return Response(data)
+

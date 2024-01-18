@@ -20,7 +20,20 @@ class CustomUser(AbstractUser):
     )
     role = models.CharField(max_length=10, choices=ROLE_CHOICES)
 
-# Client Profile Model
+    def save(self, *args, **kwargs):
+        if self._state.adding and len(self.username) < 8:
+            raise ValidationError("Username must be at least 8 characters long")
+
+        super().save(*args, **kwargs)
+
+        # Update ClientProfile if the user is a client
+        if self.role == 'client':
+            client_profile, created = ClientProfile.objects.get_or_create(user=self)
+            if not created:  # If the ClientProfile already exists, update it
+                client_profile.contact_name = f"{self.first_name} {self.last_name}"
+                client_profile.contact_email = self.email
+                client_profile.save()
+
 class ClientProfile(models.Model):
     PREFERRED_COMMUNICATION_CHOICES = [
         ('email', 'Email'),
@@ -65,7 +78,6 @@ class FreelancerProfile(models.Model):
         self.average_rating = total_rating / self.received_reviews.count()
         self.save()
 
-# Signal to create or update user profile
 @receiver(post_save, sender=CustomUser)
 def create_or_update_user_profile(sender, instance, created, **kwargs):
     if instance.role == 'client':
