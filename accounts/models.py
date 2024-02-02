@@ -93,7 +93,7 @@ class Review(models.Model):
 
     def save(self, *args, **kwargs):
         super(Review, self).save(*args, **kwargs)
-        self.freelancer.update_rating()  # Update freelancer's rating after a new review is saved
+        self.freelancer.update_rating()
 
     def __str__(self):
         return f"Review by {self.client.username} for {self.freelancer.user.username}"

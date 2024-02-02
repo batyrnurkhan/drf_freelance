@@ -8,10 +8,8 @@ from accounts.models import Skill
 class ListingManager(models.Manager):
     def for_user(self, user):
         if user.role == 'freelancer':
-            # Return listings where the user is the freelancer
             return self.filter(freelancer=user)
         elif user.role == 'client':
-            # Return listings created by the user
             return self.filter(user=user)
         return self.none()
 
@@ -35,11 +33,9 @@ class Listing(models.Model):
                                    related_name='taken_listings')
     skills = models.ManyToManyField(Skill, blank=True)
 
-    # New field to track interested freelancers
     objects = ListingManager()
 
     def save(self, *args, **kwargs):
-        # Existing slug generation logic...
         if not self.slug:
             self.slug = slugify(self.title)
             original_slug = self.slug

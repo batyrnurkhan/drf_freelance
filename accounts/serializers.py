@@ -85,11 +85,9 @@ class FreelancerProfileSerializer(serializers.ModelSerializer):
     def update(self, instance, validated_data):
         skill_ids = validated_data.get('skill_ids')
         if skill_ids is not None:
-            # Fetch the skills based on IDs and update
             skills = Skill.objects.filter(id__in=skill_ids)
             instance.skills.set(skills)
 
-        # Update other fields
         return super().update(instance, validated_data)
 
     def get_reviews(self, obj):

@@ -7,6 +7,5 @@ class IsClientUser(permissions.BasePermission):
     """
 
     def has_permission(self, request, view):
-        # Check if the user is authenticated and has the client role
         return request.user and request.user.is_authenticated and request.user.role == 'client'
 

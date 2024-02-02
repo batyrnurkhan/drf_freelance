@@ -61,7 +61,6 @@ class UpdateListingView(generics.UpdateAPIView):
         if listing.user != self.request.user:
             raise PermissionDenied("You can't edit a listing you didn't create.")
 
-        # Handle freelancer update
         freelancer_username = self.request.data.get('freelancer')
         if freelancer_username:
             freelancer = CustomUser.objects.filter(username=freelancer_username, role='freelancer').first()
@@ -83,16 +82,12 @@ class TakeListingView(APIView):
 
     def post(self, request, slug):
         listing = get_object_or_404(Listing, slug=slug)
-
-        # Check if the freelancer is not already assigned and if the listing is not closed
         if listing.status in ['closed', 'in_progress'] or listing.freelancer:
             return Response({'error': 'This listing is not available for taking'}, status=400)
 
-        # Ensure the user is a freelancer
         if not hasattr(request.user, 'freelancer_profile'):
             return Response({'error': 'Only freelancers can take listings'}, status=400)
 
-        # Create or get chat with the listing owner
         chat, created = Chat.get_or_create_with_participants(request.user, listing.user)
 
         # Create a message in the chat
