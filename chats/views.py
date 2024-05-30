@@ -30,20 +30,29 @@ class StartChatView(APIView):
             return Response({'error': 'Server error'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+
 class ChatListView(APIView):
+
+
     def get(self, request):
-        if not request.user.is_authenticated:
-            return Response({"error": "User not authenticated"}, status=status.HTTP_401_UNAUTHORIZED)
-
         chats = request.user.chats.all()
-        serializer = ChatSerializer(chats, many=True)
-        return Response(serializer.data)
+        chat_list = []
+        for chat in chats:
+            # Correctly filter messages that are unread and not authored by the request user
+            unread_count = chat.messages.exclude(author=request.user).filter(is_read=False).count()
+            chat_data = ChatSerializer(chat).data
+            chat_data['unread_messages'] = unread_count
+            chat_list.append(chat_data)
+        return Response(chat_list)
 
 
 
 
 
+from rest_framework.permissions import IsAuthenticatedOrReadOnly
 class ChatDetailView(APIView):
+    permission_classes = [IsAuthenticatedOrReadOnly]
+
     def get(self, request, chat_id):
         chat = get_object_or_404(Chat, id=chat_id)
         serializer = ChatSerializer(chat)
@@ -57,6 +66,15 @@ class ChatDetailView(APIView):
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+    def delete(self, request, chat_id):
+        chat = get_object_or_404(Chat, id=chat_id)
+        # Check if the request.user is in chat participants
+        if request.user in chat.participants.all():
+            chat.delete()
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        else:
+            return Response({"error": "You do not have permission to delete this chat."},
+                            status=status.HTTP_403_FORBIDDEN)
 
 class ChatCreateView(APIView):
     def post(self, request, username):
@@ -84,3 +102,11 @@ class SendMessageView(APIView):
             serializer.save(author=request.user, chat=chat)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class MarkAsReadView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, chat_id):
+        Chat.objects.filter(id=chat_id, participants=request.user).update(messages__is_read=True)
+        return Response({"message": "Messages marked as read."}, status=status.HTTP_200_OK)

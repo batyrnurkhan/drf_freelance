@@ -66,7 +66,8 @@ class FreelancerProfile(models.Model):
     portfolio = models.URLField(max_length=255, blank=True)
     skills = models.ManyToManyField(Skill, blank=True)
     average_rating = models.FloatField(default=0.0)
-    reviews = models.TextField(blank=True)  # Simple text field for reviews, consider a related model for more complexity
+    reviews = models.TextField(blank=True)
+    skills_not_in_list = models.CharField(max_length=50, blank=True)
     profile_image = models.ImageField(upload_to='profile_images', blank=True)
     introduction_video = models.FileField(
         upload_to='introduction_videos/%Y/%m/%d/',

@@ -73,6 +73,7 @@ class FreelancerProfileSerializer(serializers.ModelSerializer):
             'profile_image',
             'average_rating',
             'reviews',
+            'skills_not_in_list',
             'introduction_video',
         ]
         extra_kwargs = {'skills': {'read_only': True}}
@@ -120,7 +121,8 @@ from .models import Review
 class ReviewSerializer(serializers.ModelSerializer):
     class Meta:
         model = Review
-        fields = ['rating', 'text']
+        fields = ['id', 'rating', 'text', 'client', 'freelancer']
+
 
 class SkillSerializer(serializers.ModelSerializer):
     class Meta:

@@ -15,4 +15,12 @@ class ChatSerializer(serializers.ModelSerializer):
         fields = ['id', 'participant_usernames', 'messages']  # Include 'participant_usernames' here
 
     def get_participant_usernames(self, obj):
-        return [user.username for user in obj.participants.all()]
+        try:
+            participants = obj.participants.all()
+            return [user.username for user in participants]
+        except AttributeError as e:
+            # Log the error or print it. Adjust logging based on your project setup
+            print(f"Error in get_participant_usernames: {str(e)}")
+            # Optionally, inspect the object type
+            print(f"Object type passed: {type(obj)}")
+            return []

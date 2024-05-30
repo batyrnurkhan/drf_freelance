@@ -9,4 +9,5 @@ urlpatterns = [
     path('chats/<int:chat_id>/', ChatDetailView.as_view(), name='chat_detail'),
     path('start-chat/<str:username>/', StartChatView.as_view(), name='start_chat'),
     path('chats/<int:chat_id>/send/', SendMessageView.as_view(), name='send_message'),
+
 ]

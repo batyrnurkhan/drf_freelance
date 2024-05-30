@@ -217,3 +217,31 @@ def search_freelancers(request):
     data = [{'username': freelancer.user.username} for freelancer in freelancers]
     return Response(data)
 
+
+
+from django.contrib.auth.decorators import login_required
+@api_view(['POST'])
+@login_required
+def create_review(request, freelancer_id):
+    if request.user.role != 'client':
+        return Response({'error': 'Only clients can create reviews'}, status=status.HTTP_403_FORBIDDEN)
+
+    freelancer_profile = FreelancerProfile.objects.get(pk=freelancer_id)
+    serializer = ReviewSerializer(data=request.data)
+    if serializer.is_valid():
+        serializer.save(client=request.user, freelancer=freelancer_profile)
+        freelancer_profile.update_rating()  # Assume this method updates and saves the average rating
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+    else:
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+from rest_framework import generics
+from .models import Review, FreelancerProfile
+from .serializers import ReviewSerializer
+class FreelancerReviewsListView(generics.ListAPIView):
+    serializer_class = ReviewSerializer
+
+    def get_queryset(self):
+        username = self.kwargs.get('username')
+        freelancer_profile = get_object_or_404(FreelancerProfile, user__username=username)
+        return Review.objects.filter(freelancer=freelancer_profile)
