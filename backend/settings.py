@@ -46,6 +46,10 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
+# settings.py in the second project
+FIRST_PROJECT_API_URL = 'https://presidentski.pythonanywhere.com/accounts/api/register/'
+FIRST_PROJECT_ORDER_API_URL = 'http://presidentski.pythonanywhere.com/listings/api/orders/create/'
+
 ROOT_URLCONF = 'backend.urls'
 
 TEMPLATES = [

@@ -13,6 +13,11 @@ class Skill(models.Model):
     def __str__(self):
         return self.name
 
+class SkillMapping(models.Model):
+    second_project_skill = models.ForeignKey(Skill, on_delete=models.CASCADE)
+    first_project_skill_id = models.IntegerField()
+
+
 class CustomUser(AbstractUser):
     ROLE_CHOICES = (
         ('client', 'Client'),

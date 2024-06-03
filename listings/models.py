@@ -2,8 +2,9 @@
 from django.db import models
 from django.conf import settings
 from django.utils.text import slugify
-from accounts.models import Skill
-
+from accounts.models import Skill,SkillMapping
+import requests
+from django.conf import settings
 
 class ListingManager(models.Manager):
     def for_user(self, user):
@@ -36,14 +37,28 @@ class Listing(models.Model):
     objects = ListingManager()
 
     def save(self, *args, **kwargs):
-        if not self.slug:
-            self.slug = slugify(self.title)
-            original_slug = self.slug
-            num = 1
-            while Listing.objects.filter(slug=self.slug).exists():
-                self.slug = f'{original_slug}-{num}'
-                num += 1
         super(Listing, self).save(*args, **kwargs)
+        data = {
+            'title': self.title,
+            'description': self.description,
+            'price': str(self.price),
+            'skills': [mapping.first_project_skill_id for mapping in SkillMapping.objects.filter(second_project_skill__in=self.skills.all())],
+            'client': self.user_id,
+            'status': self.status
+        }
+
+        print("Data being sent:", data)  # Log the data being sent to troubleshoot
+
+        response = requests.post(settings.FIRST_PROJECT_ORDER_API_URL, json=data)  # Note: Use json= here
+        if response.status_code == 201:
+            try:
+                response_data = response.json()
+                print("Data received:", response_data)
+            except ValueError:
+                print("Failed to decode JSON from response:", response.text)
+        else:
+            print("Failed to sync order with the first project:", response.status_code, response.text)
 
     def __str__(self):
         return self.title
+

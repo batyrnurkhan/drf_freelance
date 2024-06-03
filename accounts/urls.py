@@ -16,6 +16,6 @@ urlpatterns = [
     path('skills/', SkillListView.as_view(), name='skill-list'),
     path('search/freelancers/', SearchFreelancerView.as_view(), name='search_freelancers'),
     path('editlisting/search/', search_freelancers, name='search_freelancers'),
-    path('freelancer/<str:username>/review/',create_review, name='create-review'),
-    path('freelancer/<str:username>/reviews/', FreelancerReviewsListView.as_view(), name='freelancer-reviews-list'),
+    path('freelancer/<str:username>/review/', CreateReviewView.as_view(), name='create-review'),
+    path('reviews/freelancer/<str:username>/', FreelancerReviewsListView.as_view(), name='freelancer-reviews'),
 ]

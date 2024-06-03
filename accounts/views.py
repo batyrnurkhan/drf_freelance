@@ -10,13 +10,33 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework import status
 from rest_framework.parsers import JSONParser
-
+import requests
+from rest_framework import status
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from django.conf import settings
+from .serializers import UserRegistrationSerializer
 class UserRegistrationAPIView(APIView):
     def post(self, request, *args, **kwargs):
         serializer = UserRegistrationSerializer(data=request.data)
         if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
+            user = serializer.save()
+            # Prepare data for the first project
+            data_for_first_project = request.data.copy()
+            data_for_first_project['user_type'] = data_for_first_project.pop('role')  # Convert 'role' to 'user_type'
+
+            # Now register this user in the first project
+            response = requests.post(settings.FIRST_PROJECT_API_URL, data=data_for_first_project)
+            if response.status_code == 201:
+                return Response({
+                    'id': user.id,
+                    'username': user.username,
+                    'email': user.email,
+                    'first_project_id': response.json().get('id')
+                }, status=status.HTTP_201_CREATED)
+            else:
+                user.delete()  # Optionally delete the user if the first project registration fails
+                return Response(response.json(), status=response.status_code)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
@@ -84,20 +104,27 @@ class FreelancerProfileView(generics.RetrieveAPIView):
         obj = get_object_or_404(queryset, user=user)
         return obj
 
+from rest_framework import generics, permissions
+from rest_framework.response import Response
+from .models import FreelancerProfile, Review
+from .serializers import ReviewSerializer
 
 class CreateReviewView(generics.CreateAPIView):
+    queryset = Review.objects.all()
     serializer_class = ReviewSerializer
     permission_classes = [permissions.IsAuthenticated]
 
     def perform_create(self, serializer):
-        freelancer_username = self.kwargs.get('username')
-        freelancer = get_object_or_404(CustomUser, username=freelancer_username, role='freelancer').freelancer_profile
-        client = self.request.user
+        username = self.kwargs.get('username')
+        freelancer = get_object_or_404(FreelancerProfile, user__username=username)
 
-        if client.role != 'client':
+        if self.request.user.role != 'client':
             raise permissions.PermissionDenied("Only clients can give reviews.")
 
-        serializer.save(client=client, freelancer=freelancer)
+        if Review.objects.filter(client=self.request.user, freelancer=freelancer).exists():
+            raise ValidationError("You have already reviewed this freelancer.")
+
+        serializer.save(client=self.request.user, freelancer=freelancer)
 
 
 class TopFreelancersView(ListAPIView):
@@ -134,34 +161,27 @@ class UserProfileUpdateView(APIView):
     parser_classes = [MultiPartParser, FormParser, JSONParser]
 
     def put(self, request, *args, **kwargs):
-        print("Received data for update:", request.data)
-
         user = request.user
         data = request.data
 
-        # Update user details
         user_serializer = UserSerializer(user, data=data, partial=True)
         if user_serializer.is_valid():
             user_serializer.save()
 
-        # Update profile details based on user role, including video file
+        profile_serializer = None
         if user.role == 'freelancer':
             profile_serializer = FreelancerProfileSerializer(user.freelancer_profile, data=data, partial=True)
-            if profile_serializer.is_valid():
-                profile_serializer.save()
-                return Response(profile_serializer.data, status=status.HTTP_200_OK)
-            return Response(profile_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         elif user.role == 'client':
-            profile = user.client_profile
-            profile_serializer = ClientProfileSerializer(profile, data=data, partial=True)
-        else:
-            return Response({'error': 'Invalid user role'}, status=status.HTTP_400_BAD_REQUEST)
+            profile_serializer = ClientProfileSerializer(user.client_profile, data=data, partial=True)
 
-        if profile_serializer.is_valid():
+        if profile_serializer and profile_serializer.is_valid():
             profile_serializer.save()
+            if 'profile_image' in request.FILES:
+                user.profile_image = request.FILES['profile_image']
+                user.save()
             return Response({**user_serializer.data, **profile_serializer.data}, status=status.HTTP_200_OK)
 
-        return Response({**user_serializer.errors, **profile_serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({**user_serializer.errors, **(profile_serializer.errors if profile_serializer else {})}, status=status.HTTP_400_BAD_REQUEST)
 
 class UserLoginAPIView(APIView):
     def post(self, request, *args, **kwargs):
@@ -238,10 +258,11 @@ def create_review(request, freelancer_id):
 from rest_framework import generics
 from .models import Review, FreelancerProfile
 from .serializers import ReviewSerializer
+
 class FreelancerReviewsListView(generics.ListAPIView):
     serializer_class = ReviewSerializer
+    permission_classes = [permissions.AllowAny]
 
     def get_queryset(self):
-        username = self.kwargs.get('username')
-        freelancer_profile = get_object_or_404(FreelancerProfile, user__username=username)
-        return Review.objects.filter(freelancer=freelancer_profile)
+        freelancer_id = self.kwargs.get('freelancer_id')
+        return Review.objects.filter(freelancer__id=freelancer_id)

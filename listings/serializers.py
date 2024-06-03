@@ -53,6 +53,16 @@ class TakeListingSerializer(serializers.ModelSerializer):
 
     def update(self, instance, validated_data):
         instance.freelancer = validated_data.get('freelancer', instance.freelancer)
-        instance.status = validated_data.get('status', instance.status)
+        if instance.freelancer and instance.status == 'open':  # Check if a freelancer is being set
+            instance.status = 'in_progress'
         instance.save()
         return instance
+
+class OrderSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Listing
+        fields = '__all__'  # Adjust fields based on what you are sending
+
+    def create(self, validated_data):
+        return Listing.objects.create(**validated_data)
+

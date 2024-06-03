@@ -8,7 +8,7 @@ from django.db.models import Count, Q
 from django.core.exceptions import PermissionDenied
 
 from .models import Listing
-from .serializers import ListingSerializer, OpenListingSerializer, TakeListingSerializer
+from .serializers import ListingSerializer, OpenListingSerializer, TakeListingSerializer, OrderSerializer
 from .permissions import IsClientUser
 from accounts.models import CustomUser, FreelancerProfile, Skill
 from accounts.serializers import FreelancerProfileSerializer
@@ -57,6 +57,7 @@ class UpdateListingView(generics.UpdateAPIView):
 
     def perform_update(self, serializer):
         listing = serializer.instance
+        current_freelancer = listing.freelancer
 
         if listing.user != self.request.user:
             raise PermissionDenied("You can't edit a listing you didn't create.")
@@ -66,6 +67,8 @@ class UpdateListingView(generics.UpdateAPIView):
             freelancer = CustomUser.objects.filter(username=freelancer_username, role='freelancer').first()
             if freelancer:
                 listing.freelancer = freelancer
+                if not current_freelancer:
+                    listing.status = 'in_progress'  # Update status only if it's the first time setting a freelancer
             else:
                 raise serializers.ValidationError({"freelancer": "Freelancer not found or not valid."})
 
@@ -82,11 +85,15 @@ class TakeListingView(APIView):
 
     def post(self, request, slug):
         listing = get_object_or_404(Listing, slug=slug)
-        if listing.status in ['closed', 'in_progress'] or listing.freelancer:
-            return Response({'error': 'This listing is not available for taking'}, status=400)
+        if listing.status in ['closed', 'in progress'] or listing.freelancer:
+            return Response({'error': 'This listing is not available for taking'}, status=status.HTTP_400_BAD_REQUEST)
 
         if not hasattr(request.user, 'freelancer_profile'):
-            return Response({'error': 'Only freelancers can take listings'}, status=400)
+            return Response({'error': 'Only freelancers can take listings'}, status=status.HTTP_400_BAD_REQUEST)
+
+        listing.freelancer = request.user
+        listing.status = 'in_progress'
+        listing.save()
 
         chat, created = Chat.get_or_create_with_participants(request.user, listing.user)
 
@@ -97,7 +104,7 @@ class TakeListingView(APIView):
             content=f"Hi {listing.user.username}, I am interested in your listing '{listing.title}'."
         )
 
-        return Response({'message': 'Interest expressed in listing'}, status=200)
+        return Response({'message': 'Listing taken and status updated to in progress'}, status=status.HTTP_200_OK)
 
 class SelectFreelancerView(generics.UpdateAPIView):
     queryset = Listing.objects.all()
@@ -187,3 +194,13 @@ class UserSpecificListingsView(generics.ListAPIView):
     def get_queryset(self):
         user = self.request.user
         return Listing.objects.for_user(user)
+
+
+class OrderCreateAPIView(APIView):
+    def post(self, request, *args, **kwargs):
+        serializer = OrderSerializer(data=request.data)
+        if serializer.is_valid():
+            listing = serializer.save()
+            return Response({'id': listing.id}, status=status.HTTP_201_CREATED)
+        else:
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
